@@ -162,12 +162,15 @@ namespace NoSilence
         {
             try
             {
-                // Construct the FFmpeg arguments using the silenceThreshold parameter
-                string arguments = $"-i \"{inputFilePath}\" -af silenceremove=start_periods=1:start_duration=1:start_threshold=-{silenceThreshold}dB:detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:start_duration=1:start_threshold=-{silenceThreshold}dB:detection=peak,aformat=dblp,areverse \"{outputFilePath}\"";
+                // Step 1: Extract the bitrate of the input file
+                string bitrate = GetBitrate(inputFilePath);
+
+                // Step 2: Prepare FFmpeg command with extracted bitrate
+                string arguments = $"-i \"{inputFilePath}\" -b:a {bitrate} -af silenceremove=start_periods=1:start_duration=1:start_threshold=-{silenceThreshold}dB:detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:start_duration=1:start_threshold=-{silenceThreshold}dB:detection=peak,aformat=dblp,areverse \"{outputFilePath}\"";
 
                 Process ffmpegProcess = new Process();
                 ffmpegProcess.StartInfo.FileName = ffmpegPath;
-                ffmpegProcess.StartInfo.Arguments = $"-fflags +nobuffer -progress pipe:1 -nostats {arguments}";
+                ffmpegProcess.StartInfo.Arguments = arguments;
                 ffmpegProcess.StartInfo.UseShellExecute = false;
                 ffmpegProcess.StartInfo.RedirectStandardOutput = true;
                 ffmpegProcess.StartInfo.RedirectStandardError = true;
@@ -208,6 +211,43 @@ namespace NoSilence
                 Log.Error(ex, "Error running FFmpeg");
             }
         }
+
+        private string GetBitrate(string inputFilePath)
+        {
+            try
+            {
+                Process ffmpegProcess = new Process();
+                ffmpegProcess.StartInfo.FileName = ffmpegPath;
+                ffmpegProcess.StartInfo.Arguments = $"-i \"{inputFilePath}\"";
+                ffmpegProcess.StartInfo.UseShellExecute = false;
+                ffmpegProcess.StartInfo.RedirectStandardError = true;
+                ffmpegProcess.StartInfo.CreateNoWindow = true;
+
+                ffmpegProcess.Start();
+
+                string output = ffmpegProcess.StandardError.ReadToEnd();
+                ffmpegProcess.WaitForExit();
+
+                // Parse the output to find the bitrate
+                var bitrateLine = output.Split('\n').FirstOrDefault(line => line.Contains("bitrate"));
+                if (!string.IsNullOrEmpty(bitrateLine))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(bitrateLine, @"bitrate:\s*(\d+)\s*kb/s");
+                    if (match.Success)
+                    {
+                        return match.Groups[1].Value + "k";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error extracting bitrate from file: {FilePath}", inputFilePath);
+            }
+
+            // Default bitrate if extraction fails
+            return "192k";
+        }
+
 
 
 
