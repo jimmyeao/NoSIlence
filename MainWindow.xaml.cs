@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
 using Serilog; // Assuming Serilog is used for logging
@@ -12,7 +11,7 @@ namespace NoSilence
     {
         private string ffmpegPath;
         private string selectedFilePath;
-        private string outputDirectory;
+        private string selectedOutputFolder;
 
         public MainWindow()
         {
@@ -55,6 +54,15 @@ namespace NoSilence
             }
         }
 
+        private void FileList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (fileList.SelectedItem != null)
+            {
+                selectedFilePath = fileList.SelectedItem.ToString();
+                Log.Information("File selected: {SelectedFilePath}", selectedFilePath);
+            }
+        }
+
         private void Preview_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(selectedFilePath) || !File.Exists(selectedFilePath))
@@ -68,7 +76,7 @@ namespace NoSilence
             previewWindow.Show();
         }
 
-        private async void RemoveSilence_Click(object sender, RoutedEventArgs e)
+        private void RemoveSilence_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath))
             {
@@ -84,13 +92,14 @@ namespace NoSilence
 
             // Prompt for output directory
             var folderDialog = new System.Windows.Forms.FolderBrowserDialog();
-            if (folderDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            var result = folderDialog.ShowDialog();
+            if (result == System.Windows.Forms.DialogResult.OK)
             {
-                outputDirectory = folderDialog.SelectedPath;
+                selectedOutputFolder = folderDialog.SelectedPath;
             }
             else
             {
-                MessageBox.Show("Please select a directory to save the processed files.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Please select a directory to save the files.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -102,74 +111,62 @@ namespace NoSilence
                     continue;
                 }
 
-                string outputFilePath = overwriteCheckBox.IsChecked == true
-                    ? filePath
-                    : Path.Combine(outputDirectory, "trimmed_" + Path.GetFileName(filePath));
+                string outputFilePath = Path.Combine(selectedOutputFolder, Path.GetFileName(filePath));
+                string arguments = $"-i \"{filePath}\" -af \"silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:start_duration=2:start_threshold=-50dB:detection=peak,aformat=dblp,areverse\" \"{outputFilePath}\"";
 
-                // Run FFmpeg in a separate task
-                await RunFFmpegAsync(filePath, outputFilePath);
+                RunFFmpegProcess(arguments);
             }
         }
 
-        private async Task RunFFmpegAsync(string inputFilePath, string outputFilePath)
+        private void RunFFmpegProcess(string arguments)
         {
-            // Corrected FFmpeg command with proper formatting
-            string arguments = $"-i \"{inputFilePath}\" -af \"silenceremove=start_periods=1:start_duration=0.5:start_threshold=-60dB:detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:start_duration=0.5:start_threshold=-60dB:detection=peak,aformat=dblp,areverse\" \"{outputFilePath}\"";
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = ffmpegPath,
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
             try
             {
-                using (var process = new Process { StartInfo = startInfo })
+                Process ffmpegProcess = new Process();
+                ffmpegProcess.StartInfo.FileName = ffmpegPath;
+                ffmpegProcess.StartInfo.Arguments = arguments;
+                ffmpegProcess.StartInfo.UseShellExecute = false;
+                ffmpegProcess.StartInfo.RedirectStandardOutput = true;
+                ffmpegProcess.StartInfo.RedirectStandardError = true;
+                ffmpegProcess.StartInfo.CreateNoWindow = true;
+
+                // Register event handlers for output
+                ffmpegProcess.OutputDataReceived += (sender, e) =>
                 {
-                    process.OutputDataReceived += (sender, e) => Dispatcher.Invoke(() =>
+                    if (!string.IsNullOrEmpty(e.Data))
                     {
-                        if (e.Data != null) outputTextBox.AppendText(e.Data + Environment.NewLine);
-                    });
-
-                    process.ErrorDataReceived += (sender, e) => Dispatcher.Invoke(() =>
-                    {
-                        if (e.Data != null) outputTextBox.AppendText(e.Data + Environment.NewLine);
-                    });
-
-                    process.Start();
-                    process.BeginOutputReadLine();
-                    process.BeginErrorReadLine();
-
-                    await process.WaitForExitAsync();
-
-                    if (process.ExitCode != 0)
-                    {
-                        Dispatcher.Invoke(() => MessageBox.Show($"Error removing silence from {inputFilePath}.", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            outputTextBox.AppendText(e.Data + Environment.NewLine);
+                            outputTextBox.ScrollToEnd(); // Ensure the latest output is visible
+                        }));
                     }
-                    else
+                };
+
+                ffmpegProcess.ErrorDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
                     {
-                        Dispatcher.Invoke(() => MessageBox.Show($"Silence removed successfully from {inputFilePath}.", "Success", MessageBoxButton.OK, MessageBoxImage.Information));
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            outputTextBox.AppendText(e.Data + Environment.NewLine);
+                            outputTextBox.ScrollToEnd(); // Ensure the latest output is visible
+                        }));
                     }
-                }
+                };
+
+                // Start the FFmpeg process and begin reading output
+                ffmpegProcess.Start();
+                ffmpegProcess.BeginOutputReadLine();
+                ffmpegProcess.BeginErrorReadLine();
+                ffmpegProcess.WaitForExit();
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error running FFmpeg process.");
-                Dispatcher.Invoke(() => MessageBox.Show($"An error occurred while processing: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                MessageBox.Show($"Error running FFmpeg: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Log.Error(ex, "Error running FFmpeg");
             }
         }
 
-
-        private void FileList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
-            if (fileList.SelectedItem != null)
-            {
-                selectedFilePath = fileList.SelectedItem.ToString();
-            }
-        }
     }
 }
