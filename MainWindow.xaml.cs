@@ -155,6 +155,13 @@ namespace NoSilence
 
             MessageBox.Show("Processing completed.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
             currentFileLabel.Content = "Processing: Completed";
+            // open the outputFilePath folder
+            // Open the outputFilePath folder
+            Process.Start("explorer.exe", $"/select,\"{selectedOutputFolder}\"");
+            fileList.Items.Clear();
+            //clear the fileList in the ui
+
+
         }
 
 
@@ -211,7 +218,24 @@ namespace NoSilence
                 Log.Error(ex, "Error running FFmpeg");
             }
         }
+        private void Load_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "MP3 Files (*.mp3)|*.mp3",
+                Multiselect = true,
+                Title = "Select MP3 Files"
+            };
 
+            if (openFileDialog.ShowDialog() == true)
+            {
+                foreach (string file in openFileDialog.FileNames)
+                {
+                    fileList.Items.Add(file);
+                    Log.Information("File added: {FilePath}", file);
+                }
+            }
+        }
         private string GetBitrate(string inputFilePath)
         {
             try
