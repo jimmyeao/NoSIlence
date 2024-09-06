@@ -3,21 +3,42 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="MP3 Trimmer" Height="600" Width="525"
         AllowDrop="True" Drop="Window_Drop">
-    <Grid>
-        <ListBox x:Name="fileList" HorizontalAlignment="Left" Height="250" VerticalAlignment="Top" Width="500" 
-                 SelectionChanged="FileList_SelectionChanged" />
+    <Grid Margin="10">
 
-        <Button Content="Remove Silence" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,268,0,0" Width="120" Click="RemoveSilence_Click"/>
-        <Button Content="Preview" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="140,268,0,0" Width="120" Click="Preview_Click"/>
+        <!-- ListBox for displaying the files -->
+        <ListBox x:Name="fileList" HorizontalAlignment="Stretch" Height="200" VerticalAlignment="Top"
+                 SelectionChanged="FileList_SelectionChanged" Margin="0,0,0,10" />
 
-        <CheckBox x:Name="overwriteCheckBox" Content="Overwrite Original Files" HorizontalAlignment="Left" Margin="10,308,0,-48"/>
+        <!-- Controls for actions and settings -->
+        <StackPanel Orientation="Vertical" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,220,0,0">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Content="Remove Silence" Width="120" Click="RemoveSilence_Click"/>
+                <Button Content="Preview" Width="120" Margin="10,0,0,0" Click="Preview_Click"/>
+            </StackPanel>
 
-        <!-- New controls for FFmpeg selection -->
-        <TextBox x:Name="ffmpegPathTextBox" HorizontalAlignment="Left" Margin="10,348,0,189" Width="350" Text="C:\ffmpeg\bin\ffmpeg.exe"/>
-        <Button Content="Browse FFmpeg" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,348,0,0" Width="120" Click="BrowseFFmpeg_Click"/>
+            <CheckBox x:Name="overwriteCheckBox" Content="Overwrite Original Files" Margin="0,0,0,10"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <Label Content="Silence Threshold (dB)" VerticalAlignment="Center"/>
+                <TextBox x:Name="silenceThresholdTextBox" Width="100" Text="60" Margin="10,0,0,0"/>
+            </StackPanel>
+
+            <!-- Controls for FFmpeg selection -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <TextBox x:Name="ffmpegPathTextBox" Width="350" Text="C:\ffmpeg\bin\ffmpeg.exe"/>
+                <Button Content="Browse FFmpeg" Width="120" Margin="10,0,0,0" Click="BrowseFFmpeg_Click"/>
+            </StackPanel>
+        </StackPanel>
 
         <!-- Output TextBox for FFmpeg output -->
-        <TextBox x:Name="outputTextBox" HorizontalAlignment="Left" Margin="10,400,0,0" VerticalAlignment="Top" Width="500" Height="150" 
-                 VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" IsReadOnly="True"/>
+        <TextBox x:Name="outputTextBox" HorizontalAlignment="Stretch" Margin="0,410,0,0" VerticalAlignment="Top"
+                 Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" IsReadOnly="True"/>
+
+        <!-- Progress bar and current file label -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,10">
+            <ProgressBar x:Name="processingProgressBar" Width="350" Height="20" Margin="0,0,10,0"/>
+            <Label x:Name="currentFileLabel" Content="Processing: " VerticalAlignment="Center"/>
+        </StackPanel>
+
     </Grid>
 </Window>

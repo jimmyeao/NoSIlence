@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <AssemblyVersion>1.0.0.81</AssemblyVersion>
-    <FileVersion>1.0.0.81</FileVersion>
+    <AssemblyVersion>1.0.0.88</AssemblyVersion>
+    <FileVersion>1.0.0.88</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

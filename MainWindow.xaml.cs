@@ -12,6 +12,7 @@ namespace NoSilence
         private string ffmpegPath;
         private string selectedFilePath;
         private string selectedOutputFolder;
+        private int silenceThreshold = 60; // Default value
 
         public MainWindow()
         {
@@ -76,7 +77,7 @@ namespace NoSilence
             previewWindow.Show();
         }
 
-        private void RemoveSilence_Click(object sender, RoutedEventArgs e)
+        private async void RemoveSilence_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath))
             {
@@ -84,26 +85,27 @@ namespace NoSilence
                 return;
             }
 
-            if (fileList.SelectedItems.Count == 0)
+            if (fileList.Items.Count == 0)
             {
                 MessageBox.Show("Please select at least one MP3 file to process.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            // Prompt for output directory
-            var folderDialog = new System.Windows.Forms.FolderBrowserDialog();
-            var result = folderDialog.ShowDialog();
-            if (result == System.Windows.Forms.DialogResult.OK)
+            // Ask user for output directory
+            using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
             {
-                selectedOutputFolder = folderDialog.SelectedPath;
-            }
-            else
-            {
-                MessageBox.Show("Please select a directory to save the files.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                System.Windows.Forms.DialogResult result = dialog.ShowDialog();
+                if (result != System.Windows.Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                {
+                    return;
+                }
+                selectedOutputFolder = dialog.SelectedPath;
             }
 
-            foreach (string filePath in fileList.SelectedItems)
+            processingProgressBar.Maximum = fileList.Items.Count;
+            processingProgressBar.Value = 0;
+
+            foreach (string filePath in fileList.Items)
             {
                 if (!File.Exists(filePath))
                 {
@@ -112,25 +114,43 @@ namespace NoSilence
                 }
 
                 string outputFilePath = Path.Combine(selectedOutputFolder, Path.GetFileName(filePath));
-                string arguments = $"-i \"{filePath}\" -af \"silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:start_duration=2:start_threshold=-50dB:detection=peak,aformat=dblp,areverse\" \"{outputFilePath}\"";
 
-                RunFFmpegProcess(arguments);
+                currentFileLabel.Content = $"Processing: {Path.GetFileName(filePath)}";
+
+                if (File.Exists(outputFilePath))
+                {
+                    var result = MessageBox.Show($"File {outputFilePath} already exists. Overwrite?", "File Exists", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                    if (result == MessageBoxResult.No) continue;
+                    if (result == MessageBoxResult.Cancel) break;
+
+                    File.Delete(outputFilePath);
+                }
+
+                // Run FFmpeg and update progress
+                await Task.Run(() => RunFFmpegProcess(filePath, outputFilePath, silenceThreshold));
+
+                processingProgressBar.Value++;
             }
+
+            MessageBox.Show("Processing completed.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            currentFileLabel.Content = "Processing: Completed";
         }
 
-        private void RunFFmpegProcess(string arguments)
+        private void RunFFmpegProcess(string inputFilePath, string outputFilePath, int silenceThreshold)
         {
             try
             {
+                // Construct the FFmpeg arguments using the silenceThreshold parameter
+                string arguments = $"-i \"{inputFilePath}\" -af silenceremove=start_periods=1:start_duration=1:start_threshold=-{silenceThreshold}dB:detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:start_duration=1:start_threshold=-{silenceThreshold}dB:detection=peak,aformat=dblp,areverse \"{outputFilePath}\"";
+
                 Process ffmpegProcess = new Process();
                 ffmpegProcess.StartInfo.FileName = ffmpegPath;
-                ffmpegProcess.StartInfo.Arguments = arguments;
+                ffmpegProcess.StartInfo.Arguments = $"-fflags +nobuffer -progress pipe:1 -nostats {arguments}";
                 ffmpegProcess.StartInfo.UseShellExecute = false;
                 ffmpegProcess.StartInfo.RedirectStandardOutput = true;
                 ffmpegProcess.StartInfo.RedirectStandardError = true;
                 ffmpegProcess.StartInfo.CreateNoWindow = true;
 
-                // Register event handlers for output
                 ffmpegProcess.OutputDataReceived += (sender, e) =>
                 {
                     if (!string.IsNullOrEmpty(e.Data))
@@ -138,7 +158,7 @@ namespace NoSilence
                         Dispatcher.BeginInvoke(new Action(() =>
                         {
                             outputTextBox.AppendText(e.Data + Environment.NewLine);
-                            outputTextBox.ScrollToEnd(); // Ensure the latest output is visible
+                            outputTextBox.ScrollToEnd();
                         }));
                     }
                 };
@@ -150,12 +170,11 @@ namespace NoSilence
                         Dispatcher.BeginInvoke(new Action(() =>
                         {
                             outputTextBox.AppendText(e.Data + Environment.NewLine);
-                            outputTextBox.ScrollToEnd(); // Ensure the latest output is visible
+                            outputTextBox.ScrollToEnd();
                         }));
                     }
                 };
 
-                // Start the FFmpeg process and begin reading output
                 ffmpegProcess.Start();
                 ffmpegProcess.BeginOutputReadLine();
                 ffmpegProcess.BeginErrorReadLine();
@@ -167,6 +186,9 @@ namespace NoSilence
                 Log.Error(ex, "Error running FFmpeg");
             }
         }
+
+
+
 
     }
 }
