@@ -1,5 +1,8 @@
 First release, probably full of bugs...
 
+Downlod here https://github.com/jimmyeao/NoSIlence/releases/tag/first_release
+
+
 The aim is to remove silence from the beginning and end of mp3 files, with a user adjustable limit for silence "volume".
 
 To use this, you will need ffmpeg.exe https://www.ffmpeg.org/download.html
