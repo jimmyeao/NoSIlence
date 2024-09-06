@@ -105,6 +105,7 @@ namespace NoSilence
             processingProgressBar.Maximum = fileList.Items.Count;
             processingProgressBar.Value = 0;
 
+            bool overwriteAll = false;
             foreach (string filePath in fileList.Items)
             {
                 if (!File.Exists(filePath))
@@ -119,11 +120,31 @@ namespace NoSilence
 
                 if (File.Exists(outputFilePath))
                 {
-                    var result = MessageBox.Show($"File {outputFilePath} already exists. Overwrite?", "File Exists", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
-                    if (result == MessageBoxResult.No) continue;
-                    if (result == MessageBoxResult.Cancel) break;
+                    if (!overwriteAll)
+                    {
+                        var overwriteDialog = new OverwriteDialog(Path.GetFileName(outputFilePath));
+                        overwriteDialog.Owner = this; // Set owner for modal behavior
+                        overwriteDialog.ShowDialog();
 
-                    File.Delete(outputFilePath);
+                        switch (overwriteDialog.Result)
+                        {
+                            case OverwriteDialogResult.Yes:
+                                File.Delete(outputFilePath);
+                                break;
+                            case OverwriteDialogResult.YesToAll:
+                                overwriteAll = true;
+                                File.Delete(outputFilePath);
+                                break;
+                            case OverwriteDialogResult.No:
+                                continue;
+                            case OverwriteDialogResult.Cancel:
+                                return;
+                        }
+                    }
+                    else
+                    {
+                        File.Delete(outputFilePath);
+                    }
                 }
 
                 // Run FFmpeg and update progress
@@ -135,6 +156,7 @@ namespace NoSilence
             MessageBox.Show("Processing completed.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
             currentFileLabel.Content = "Processing: Completed";
         }
+
 
         private void RunFFmpegProcess(string inputFilePath, string outputFilePath, int silenceThreshold)
         {
