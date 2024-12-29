@@ -1,3 +1,5 @@
+[![CodeQL Advanced](https://github.com/jimmyeao/NoSIlence/actions/workflows/codeql.yml/badge.svg)](https://github.com/jimmyeao/NoSIlence/actions/workflows/codeql.yml)
+
 First release, probably full of bugs...
 
 Downlod here https://github.com/jimmyeao/NoSIlence/releases/tag/first_release
